@@ -21,11 +21,11 @@ public final class FElem extends FNode {
   /** Element name. */
   private final QNm name;
 
-  /** Child nodes (may be set to {@code null} to save memory). */
+  /** Child nodes (may be set {@code null}). */
   private ANodeList children;
-  /** Attributes (may be set to {@code null} to save memory). */
+  /** Attributes (may be set {@code null}). */
   private ANodeList atts;
-  /** Namespaces (may be set to {@code null} to save memory). */
+  /** Namespaces (may be set {@code null}). */
   private Atts ns;
 
   /**
@@ -102,27 +102,23 @@ public final class FElem extends FNode {
    * @param nsp namespaces
    */
   private FElem(final QNm n, final Atts nsp) {
-    this(n, null, null, nsp);
+    this(n, nsp, null, null);
   }
 
   /**
    * Constructor for creating an element with nodes, attributes and
    * namespace declarations.
    * @param nm element name
+   * @param nsp namespaces; can be {@code null}
    * @param ch children; can be {@code null}
    * @param at attributes; can be {@code null}
-   * @param nsp namespaces; can be {@code null}
    */
-  public FElem(final QNm nm, final ANodeList ch, final ANodeList at, final Atts nsp) {
+  public FElem(final QNm nm, final Atts nsp, final ANodeList ch, final ANodeList at) {
     super(NodeType.ELM);
     name = nm;
     children = ch;
     atts = at;
     ns = nsp;
-
-    // update parent references
-    if(ch != null) for(final ANode n : ch) n.parent(this);
-    if(at != null) for(final ANode n : at) n.parent(this);
   }
 
   /**
@@ -232,9 +228,16 @@ public final class FElem extends FNode {
 
   @Override
   public FElem optimize() {
-    if(children != null && children.size() == 0) children = null;
-    if(atts != null && atts.size() == 0) atts = null;
-    if(ns != null && ns.size() == 0) ns = null;
+    // update parent references and invalidate empty arrays
+    if(children != null) {
+      for(final ANode n : children) n.parent(this);
+      if(children.isEmpty()) children = null;
+    }
+    if(atts != null) {
+      for(final ANode n : atts) n.parent(this);
+      if(atts.isEmpty()) atts = null;
+    }
+    if(ns != null && ns.isEmpty()) ns = null;
     return this;
   }
 
@@ -389,23 +392,21 @@ public final class FElem extends FNode {
 
   @Override
   public boolean hasChildren() {
-    return children != null && children.size() != 0;
+    return children != null && !children.isEmpty();
   }
 
   @Override
-  public FNode copy() {
-    final FElem node = new FElem(name);
-    if(ns != null) {
-      node.ns = new Atts();
-      for(int n = 0; n < ns.size(); ++n) node.ns.add(ns.name(n), ns.value(n));
-    }
-    if(atts != null) {
-      for(final ANode n : atts) node.add(n.copy());
-    }
-    if(children != null) {
-      for(final ANode n : children) node.add(n.copy());
-    }
-    return node.parent(par);
+  public FElem copy() {
+    // nodes must be added after root constructor in order to ensure ascending node ids
+    final ANodeList ch = children != null ? new ANodeList(children.size()) : null;
+    final ANodeList at = atts != null ? new ANodeList(atts.size()) : null;
+    final Atts as = ns != null ? new Atts() : null;
+    final FElem node = new FElem(name, as, ch, at);
+    if(ns != null) for(int n = 0; n < ns.size(); ++n) as.add(ns.name(n), ns.value(n));
+    if(atts != null) for(final ANode n : atts) at.add(n.copy());
+    if(children != null) for(final ANode n : children) ch.add(n.copy());
+    node.parent(par);
+    return node.optimize();
   }
 
   @Override

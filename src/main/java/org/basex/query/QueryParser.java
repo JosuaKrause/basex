@@ -237,10 +237,18 @@ public class QueryParser extends InputParser {
       namespaces.put(pref, uri);
       wsCheck(";");
 
+      // get absolute path
+      final IO base = ctx.sc.baseIO();
+      final byte[] p = token(base == null ? "" : base.path());
+      ctx.modParsed.put(p, uri);
+
+      ctx.modStack.push(p);
       prolog1();
       prolog2();
 
       finish(null, check);
+
+      ctx.modStack.pop();
       return new LibraryModule(module, moduleDoc);
     } catch(final QueryException ex) {
       mark();
@@ -1059,7 +1067,7 @@ public class QueryParser extends InputParser {
         wsCheck(BY);
         skipWS();
         alterPos = pos;
-        GroupBy.Spec[] specs = groupSpecs(clauses);
+        final GroupBy.Spec[] specs = groupSpecs(clauses);
 
         // find all non-grouping variables that aren't shadowed
         final ArrayList<VarRef> ng = new ArrayList<VarRef>();
@@ -3789,12 +3797,12 @@ public class QueryParser extends InputParser {
     // in XQuery 1.0 only forward declarations are allowed (except for implicit variables)
     final boolean main = module == null, implicit = main && uri.length == 0;
     if(!(ctx.sc.xquery3() || ctx.vars.declared(name) || implicit)) {
-      throw error(VARUNDEF, '$' + string(name.string()));
+      error(VARUNDEF, '$' + string(name.string()));
     }
 
     // variable has to be declared by the same or a directly imported module
     if(!(main || eq(module.uri(), uri) || modules.contains(uri)))
-      throw error(VARUNDEF, '$' + string(name.string()));
+      error(VARUNDEF, '$' + string(name.string()));
 
     return ctx.vars.newRef(name, ctx.sc, ii);
   }
